@@ -1,0 +1,10 @@
+"filename", "language", "JSON", "XML", "comment", "blank", "total"
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/Canmodel Edits.ipynb", "JSON", 1579, 0, 0, 1, 1580
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizationCheck.ipynb", "JSON", 299, 0, 0, 1, 300
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/ANATOMY.owl", "XML", 0, 266729, 0, 4, 266733
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/family_ontology.owl", "XML", 0, 2122, 511, 1949, 4582
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/galennorm.xml.owl", "XML", 0, 564042, 1, 5, 564048
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/generations.owl", "XML", 0, 500, 1, 5, 506
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/gonorm.xml.owl", "XML", 0, 755419, 1, 5, 755425
+"/Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/goslimyeast.xml.owl", "XML", 0, 2413997, 1, 5, 2414003
+"Total", "-", 1878, 4002809, 515, 1975, 4007177

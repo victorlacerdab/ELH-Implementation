@@ -1,0 +1,35 @@
+Date : 2024-02-19 02:44:32
+Directory : /Users/victorlacerda/Documents/VSCode/ELH-Implementation
+Total : 8 files,  4004687 codes, 515 comments, 1975 blanks, all 4007177 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| XML      |          6 |  4,002,809 |        515 |      1,973 |  4,005,297 |
+| JSON     |          2 |      1,878 |          0 |          2 |      1,880 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++---------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                              | files      | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                 |          8 |  4,004,687 |        515 |      1,975 |  4,007,177 |
+| . (Files)                                                                                         |          2 |      1,878 |          0 |          2 |      1,880 |
+| NormalizedOntologies                                                                              |          6 |  4,002,809 |        515 |      1,973 |  4,005,297 |
++---------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++---------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                          | language | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/Canmodel Edits.ipynb                     | JSON     |      1,579 |          0 |          1 |      1,580 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizationCheck.ipynb                 | JSON     |        299 |          0 |          1 |        300 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/ANATOMY.owl         | XML      |    266,729 |          0 |          4 |    266,733 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/family_ontology.owl | XML      |      2,122 |        511 |      1,949 |      4,582 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/galennorm.xml.owl   | XML      |    564,042 |          1 |          5 |    564,048 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/generations.owl     | XML      |        500 |          1 |          5 |        506 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/gonorm.xml.owl      | XML      |    755,419 |          1 |          5 |    755,425 |
+| /Users/victorlacerda/Documents/VSCode/ELH-Implementation/NormalizedOntologies/goslimyeast.xml.owl | XML      |  2,413,997 |          1 |          5 |  2,414,003 |
+| Total                                                                                             |          |  4,004,687 |        515 |      1,975 |  4,007,177 |
++---------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
