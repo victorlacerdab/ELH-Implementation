@@ -12,7 +12,7 @@ owlready2.reasoning.JAVA_MEMORY = 200000
 import pandas as pd
 import numpy as np
 
-from canmodelcreation import get_concept_names_idx_dict, get_role_names_idx_dict, get_entities_idx_dict, get_domain_dict
+from Reimplementation.canmodelcreation import get_concept_names_idx_dict, get_role_names_idx_dict, get_entities_idx_dict, get_domain_dict
 
 ''' 
 Class for obtaining the positional 
