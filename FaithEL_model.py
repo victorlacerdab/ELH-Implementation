@@ -71,9 +71,9 @@ class FaithEL(nn.Module):
 
             neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
 
-            out1 = self.concept_embedding_dict(concept) 
-            out2 = self.individual_embedding_dict(subj_entity) 
-            out3 = self.individual_embedding_dict(neg_object_entity) 
+            out1 = self.concept_embedding_dict(concept) # Concept parameter
+            out2 = self.individual_embedding_dict(subj_entity) # Subject entity parameter
+            out3 = self.individual_embedding_dict(neg_object_entity) # Negatively sampled parameter
 
             return out1, out2, out3
 
@@ -89,8 +89,15 @@ class FaithEL(nn.Module):
             neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subject_entity.shape))
 
             out1 = self.role_embedding_dict(role) # Role parameter embedding
-            out2 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(object_entity)), dim=1)
-            out3 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(neg_object_entity)), dim=1)
+            out2 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(object_entity)), dim=1) # Concatenation between head and tail parameters
+
+            head_or_tail = torch.rand(1).item() > 0.5 # Returns a Boolean
+
+            if head_or_tail:
+                out3 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(neg_object_entity)), dim=1) # Concatenation between head and negatively sampled tail parameters
+
+            else:
+                out3 = torch.cat((self.individual_embedding_dict(neg_object_entity), self.individual_embedding_dict(object_entity)), dim=1)
             
             return out1, out2, out3
         
