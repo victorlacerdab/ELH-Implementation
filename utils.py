@@ -39,8 +39,6 @@ def get_hits_at_k_concept_assertions(model, GeoInterp_dataclass,
         else:
             pass
 
-    # print(f'Relevant concept idx: {relevant_concept_idx}')
-
     with torch.no_grad():
 
         for concept_idx in relevant_concept_idx:
@@ -147,12 +145,12 @@ def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
 
                 for _, tail_entity_idx in entity_to_idx_vocab.items():
                     eval_sample = torch.tensor([head_entity_idx, role_entity_idx, tail_entity_idx]).unsqueeze(0)
-                    outputs1, outputs2, outputs3 = model(eval_sample)
+                    outputs1, outputs2, outputs3 = model(eval_sample) 
 
                     if centroid_score == False:
                         assertion_score = torch.dist(outputs1, outputs2, p=2)                                                                           
                     else:
-                        assertion_score = torch.dist(outputs1, outputs2, p=2) + torch.dist(outputs2, torch.tensor(GeoInterp_dataclass.role_geointerps_dict[idx_to_role_vocab[role_entity_idx]].centroid)) # Change this random call to the GeoInterp class without it being passed
+                        assertion_score = torch.dist(outputs1, outputs2, p=2) + torch.dist(outputs2, torch.tensor(GeoInterp_dataclass.role_geointerps_dict[idx_to_role_vocab[role_entity_idx]].centroid))
 
                     assertion_scores.append((torch.tensor([head_entity_idx, role_entity_idx, tail_entity_idx]), assertion_score.item()))
 
@@ -175,9 +173,10 @@ def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
 
             else:
                 pass
-
+        
+    
     hits_at_k = [round(sum(hit_values) / len(hit_values), 3) for hit_values in zip(*hits)]  # Calculate hits_at_k for each k
-    # print(f'Hits at 1, 3, 10, 100 and all: {hits_at_k}')
+
 
     return hits_at_k
 
@@ -387,7 +386,7 @@ def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sa
         model.train()
         inputs, labels = data
         optimizer.zero_grad()
-        outputs1, outputs2, outputs3 = model(inputs) # outputs1 = Role Parameter, outputs2 = EntitySubj concat parameter, outputs3 = neg_candidate
+        outputs1, outputs2, outputs3 = model(inputs) # Outputs1 = Role Parameter, outputs2 = EntitySubj concat parameter, outputs3 = neg_candidate
 
         if neg_sampling == True:
             loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels)) + -torch.dist(outputs2, outputs3, p=2)
@@ -454,6 +453,8 @@ def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling = boo
 
 '''
 Main function for training.
+
+GeoInterp_dataclass: we need to pass the GeometricInterpretation class to the model, to the evaluation functions, and to the plotting functions.
 '''
 
 def train_model(model, GeoInterp_dataclass,
