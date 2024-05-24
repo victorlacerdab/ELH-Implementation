@@ -12,7 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
+# dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
+dir = '/Users/victorlacerda/Desktop/familyontologytest.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules
 
@@ -20,7 +21,6 @@ RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox 
 Class for creating entities to
 populate the creation of the
 canonical models.
-
 The .name attribute is used to
 create a single representation
 for concepts like A and B / 
@@ -64,7 +64,7 @@ class CanonicalModelElements:
             CanonicalModelElements.concept_intersections[self.name] = self
             CanonicalModelElements.all_concepts[self.name] = self
 
-def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, restrict_language = True):
+def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, restrict_language = False):
     
     onto = ontology
     top = owl.Thing
@@ -117,7 +117,8 @@ def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, 
     print('')
     print('All restrictions have been preprocessed for the creation of the canonical model.')
 
-    '''
+
+'''
 The main class for creating the canonical model for the ontology.
 
 The canonical model is stored in dictionaries available as class variables 'concept_canonical_interpretation'

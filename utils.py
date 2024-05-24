@@ -47,7 +47,7 @@ def get_hits_at_k_concept_assertions(model, GeoInterp_dataclass,
 
             for _, entity_idx in entity_to_idx_vocab.items():
                 eval_sample = torch.tensor([concept_idx, entity_idx]).unsqueeze(0)
-                outputs1, outputs2, outputs3 = model(eval_sample) # out1 = Concept parameter, out2 = Individual parameter
+                outputs1, outputs2, outputs3, outputs4 = model(eval_sample) # out1 = Concept parameter, out2 = Individual parameter
 
                 if centroid_score == False:
                     assertion_score = torch.dist(outputs1, outputs2, p=2) # Distance from the individual embedding from the concept parameter embedding
@@ -145,12 +145,13 @@ def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
 
                 for _, tail_entity_idx in entity_to_idx_vocab.items():
                     eval_sample = torch.tensor([head_entity_idx, role_entity_idx, tail_entity_idx]).unsqueeze(0)
-                    outputs1, outputs2, outputs3 = model(eval_sample) 
+                    outputs1, outputs2, outputs3, outputs4 = model(eval_sample)
+                    real_concat = torch.cat((outputs2, outputs3), dim=1) 
 
                     if centroid_score == False:
-                        assertion_score = torch.dist(outputs1, outputs2, p=2)                                                                           
+                        assertion_score = torch.dist(outputs1, real_concat, p=2)                                                                           
                     else:
-                        assertion_score = torch.dist(outputs1, outputs2, p=2) + torch.dist(outputs2, torch.tensor(GeoInterp_dataclass.role_geointerps_dict[idx_to_role_vocab[role_entity_idx]].centroid))
+                        assertion_score = torch.dist(outputs1, real_concat, p=2) + torch.dist(real_concat, torch.tensor(GeoInterp_dataclass.role_geointerps_dict[idx_to_role_vocab[role_entity_idx]].centroid))
 
                     assertion_scores.append((torch.tensor([head_entity_idx, role_entity_idx, tail_entity_idx]), assertion_score.item()))
 
@@ -173,7 +174,6 @@ def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
 
             else:
                 pass
-        
     
     hits_at_k = [round(sum(hit_values) / len(hit_values), 3) for hit_values in zip(*hits)]  # Calculate hits_at_k for each k
 
@@ -372,6 +372,65 @@ def plot_score_hak(hits_at_k_concept, hits_at_k_roles, topk, num_epoch, eval_fre
 
     plt.show()
 
+'''
+Helper function for computing concept assertion loss.
+'''
+
+def compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, gamma, phi, neg_sampling):
+    
+    if neg_sampling:
+        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels) + -torch.dist(outputs2, outputs3, p=2)
+
+    else:
+        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels)
+
+    return loss
+
+'''
+Helper function for computing role assertion loss.
+Args:
+    outputs1 = Role parameter;
+    outputs2 = Subject entity parameter;
+    outputs3 = Head entity parameter;
+    outputs4 = Neg sampled entity parameter;
+    labels = Centroid for the role's geometric interpretation;
+    loss_fn = The desired metric, testing with MSELoss;
+    gamma = Hyperparameter for weighting how far the individual parameters are allowed to move;
+    phi: Hyperparameter for weighting how far the role parameter is allowed to move;
+    neg_sampling: Flag for indicating whether negative sampling is used or not.
+'''
+
+def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, gamma, phi, neg_sampling):
+    
+    if neg_sampling:
+
+        real_concat_no_detach = torch.cat((outputs2, outputs3), dim=1)
+        real_concat_tail_detach = torch.cat((outputs2, outputs3.detach()), dim=1)
+        real_concat_head_detach = torch.cat((outputs2.detach(), outputs3), dim=1)
+        tail_corrupted_concat = torch.cat((outputs2, outputs4), dim=1)
+        head_corrupted_concat = torch.cat((outputs4, outputs3), dim=1)
+
+        # The loss term is defined as the sum of the a) distance between the concat between (H,T) and the centroid of the role
+        #                                            b) gamma-weighted distance between role parameter and (H,T) concat
+        #                                            c) phi-weighted distance between role parameter and centroid
+        #                                            d) negative distance between (H,T) concat and (H, Corrupt T) concat
+        #                                            e) negative distance between (H,T) concat and (Corrupt H, T) concat
+
+        loss = (loss_fn(real_concat_head_detach, labels) +
+                loss_fn(real_concat_tail_detach, labels) + 
+                gamma * loss_fn(outputs1, real_concat_head_detach) +
+                gamma * loss_fn(outputs1, real_concat_tail_detach) +
+                phi * loss_fn(outputs1, labels) +
+                - loss_fn(real_concat_head_detach, tail_corrupted_concat) +
+                - loss_fn(real_concat_tail_detach, tail_corrupted_concat) +
+                - loss_fn(real_concat_head_detach, head_corrupted_concat) +
+                - loss_fn(real_concat_tail_detach, head_corrupted_concat)
+                )
+    
+    else:
+        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels)
+
+    return loss
 
 '''
 Main training loop.
@@ -380,41 +439,36 @@ Main training loop.
 def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sampling = bool):
     model.train()
     total_loss = 0.0
-    num_batches = len(concept_dataloader)
+    num_batches = len(concept_dataloader) + len(role_dataloader)
+    #num_batches = len(role_dataloader)
 
     for i, data in enumerate(role_dataloader):
         model.train()
         inputs, labels = data
         optimizer.zero_grad()
-        outputs1, outputs2, outputs3 = model(inputs) # Outputs1 = Role Parameter, outputs2 = EntitySubj concat parameter, outputs3 = neg_candidate
+        outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs1 = Role Parameter, outputs2 = SubjEntity, out3 = HeadEntity, outputs4 = neg_candidate
 
-        if neg_sampling == True:
-            loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels)) + -torch.dist(outputs2, outputs3, p=2)
-        else:
-            loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels))
+        loss = compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, model.gamma, model.phi, neg_sampling)
 
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
 
-        model.role_parameter_constraint()
+        # model.role_parameter_constraint()
 
     for i, data in enumerate(concept_dataloader):
         model.train()
         inputs, labels = data
         optimizer.zero_grad()
-        outputs1, outputs2, outputs3 = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate
+        outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate, out4 = None
 
-        if neg_sampling == True:
-            loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels)) + -torch.dist(outputs2, outputs3, p=2)
-        else:
-            loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels))
+        loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
             
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
 
-        model.concept_parameter_constraint()
+        # model.concept_parameter_constraint()
 
     return total_loss / num_batches
 
@@ -425,27 +479,24 @@ Function for obtaining test loss.
 def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling = bool):
     model.eval()
     total_loss = 0.0
-    num_batches = len(concept_dataloader)
+    num_batches = len(concept_dataloader) + len(role_dataloader)
+    #num_batches = len(role_dataloader)
 
     with torch.no_grad():
 
         for i, data in enumerate(role_dataloader):
             inputs, labels = data
-            outputs1, outputs2, outputs3 = model(inputs) # outputs1 = Role Parameter, outputs2 = Entity concat parameter, outputs3 = Entity concat neg_candidate
-            if neg_sampling == True:
-                loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels)) + -torch.dist(outputs2, outputs3, p=2)
-            else:
-                loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels))
+            outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs1 = Role Parameter, outputs2 = SubjEntity, out3 = HeadEntity, outputs4 = neg_candidate
+            
+            loss = compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, model.gamma, model.phi, neg_sampling)
 
             total_loss += loss.item()
 
         for i, data in enumerate(concept_dataloader):
             inputs, labels = data
-            outputs1, outputs2, outputs3 = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = Entity concat neg_candidate
-            if neg_sampling == True:
-                loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels)) + -torch.dist(outputs2, outputs3, p=2)
-            else:
-                loss = (loss_fn(outputs2, labels) + model.gamma * loss_fn(outputs1, outputs2) + model.phi * loss_fn(outputs1, labels))
+            outputs1, outputs2, outputs3, _ = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate, out4 = None
+
+            loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
                 
             total_loss += loss.item()
 
@@ -491,9 +542,9 @@ def train_model(model, GeoInterp_dataclass,
         if epoch % loss_log_freq == 0:
             print(f'Epoch {epoch}/{num_epochs} -> Train Loss: {train_loss:.4f} | Test Loss: {test_loss:.4f}\n')
 
-        if epoch % eval_freq == 0:
+        if epoch % eval_freq == 0 or epoch == 0:
             print(f'Epoch {epoch}: Initiating evaluation. \n')
-            
+
             try:
                 test_hak_concept = get_hits_at_k_concept_assertions(model, GeoInterp_dataclass, test_concept_dset, test_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
                 test_hits_at_k_concept.append(test_hak_concept)

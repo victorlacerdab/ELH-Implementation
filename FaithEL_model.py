@@ -14,6 +14,8 @@ import random
 
 from create_geometric_interpretation import SCALE_FACTOR, GeometricInterpretation
 
+torch.manual_seed(200)
+
 class FaithEL(nn.Module):
     def __init__(self, emb_dim, phi, radius, gamma,
                  individual_vocabulary,
@@ -64,18 +66,18 @@ class FaithEL(nn.Module):
         if subj_entity_idx == 1:
 
             concept_idx = 0
-            
             concept = data[:, concept_idx]
-    
             subj_entity = data[:, subj_entity_idx]
 
-            neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
+            #neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
+            neg_object_entity = self.negative_sampler_concept(data)
 
             out1 = self.concept_embedding_dict(concept) # Concept parameter
             out2 = self.individual_embedding_dict(subj_entity) # Subject entity parameter
             out3 = self.individual_embedding_dict(neg_object_entity) # Negatively sampled parameter
+            out4 = None # Only a placeholder, has no bearing in calculating anything.
 
-            return out1, out2, out3
+            return out1, out2, out3, out4
 
         elif subj_entity_idx == 0:
 
@@ -86,20 +88,15 @@ class FaithEL(nn.Module):
 
             subject_entity = data[:, subj_entity_idx]
             object_entity = data[:, obj_entity_idx]
-            neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subject_entity.shape))
+            #neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subject_entity.shape))
+            neg_object_entity = self.negative_sampler_role(data)
 
             out1 = self.role_embedding_dict(role) # Role parameter embedding
-            out2 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(object_entity)), dim=1) # Concatenation between head and tail parameters
+            out2 = self.individual_embedding_dict(subject_entity)
+            out3 = self.individual_embedding_dict(object_entity)
+            out4 = self.individual_embedding_dict(neg_object_entity)
 
-            head_or_tail = torch.rand(1).item() > 0.5 # Returns a Boolean
-
-            if head_or_tail:
-                out3 = torch.cat((self.individual_embedding_dict(subject_entity), self.individual_embedding_dict(neg_object_entity)), dim=1) # Concatenation between head and negatively sampled tail parameters
-
-            else:
-                out3 = torch.cat((self.individual_embedding_dict(neg_object_entity), self.individual_embedding_dict(object_entity)), dim=1)
-            
-            return out1, out2, out3
+            return out1, out2, out3, out4
         
     def concept_parameter_constraint(self):
         with torch.no_grad():
@@ -116,3 +113,103 @@ class FaithEL(nn.Module):
                 distance = torch.dist(weight, centroid, p=2)
                 if distance > self.radius:
                     self.role_embedding_dict.weight[idx] = centroid + self.radius * (weight - centroid) / distance
+
+    # Sorts the batch row-wise e.g. unsorted = [[2,1], [0,3], [0,1]], sorted = [[0,1], [0,3], [2,1]]
+    def concept_batch_sorter(self, data):
+        sorted_databatch = data[data[:, 1].argsort (dim = 0, stable = False)]
+        sorted_databatch = sorted_databatch[sorted_databatch[:, 0].argsort (dim = 0, stable = True)]
+
+        return sorted_databatch
+    
+    def negative_sampler_concept(self, data):
+
+        with torch.no_grad():
+
+            sorted_databatch = self.concept_batch_sorter(data)
+            
+            neg_candidates = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (sorted_databatch.shape[0], 1))
+            corrupted_databatch = torch.cat((sorted_databatch[:,0].unsqueeze(1), neg_candidates), dim=1)
+            sorted_corrupted_databatch = self.concept_batch_sorter(corrupted_databatch)
+
+            counter = 0
+            MAX_ITER = 100 # This is necessary to avoid non-terminating loops.
+
+            negsamp_checker = sorted_databatch[:,1] == sorted_corrupted_databatch[:,1]
+
+            while torch.any(negsamp_checker) and counter != MAX_ITER:
+                conflict_idcs = torch.where(negsamp_checker == True)[0]
+                for idx in conflict_idcs:
+                    sorted_corrupted_databatch[idx][1] = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (1,)).item()
+
+                negsamp_checker = sorted_databatch[:,1] == sorted_corrupted_databatch[:,1]
+                counter += 1
+
+                if counter == MAX_ITER:
+                    print('================Neg sampling CONCEPT loop limit reached====================')
+
+            return sorted_corrupted_databatch[:,1]
+    
+    def role_batch_sorter(self, data, head_tail_result):
+        
+        # Handles the sorting for (h, r, ?) type queries
+        if head_tail_result:
+            sorted_databatch = data[data[:, 2].argsort (dim=0, stable=False)]
+            sorted_databatch = sorted_databatch[sorted_databatch[:,1].argsort (dim=0, stable=True)]
+            sorted_databatch = sorted_databatch[sorted_databatch[:,0].argsort (dim=0, stable=True)]
+        
+        # Handles the sorting for (?, r, t) type queries
+        else:
+            sorted_databatch = data[data[:, 2].argsort (dim=0, stable=False)]
+            sorted_databatch = sorted_databatch[sorted_databatch[:,1].argsort (dim=0, stable=True)]
+            sorted_databatch = sorted_databatch[sorted_databatch[:,0].argsort (dim=0, stable=True)]
+
+        return sorted_databatch
+
+    def negative_sampler_role(self, data):
+
+        with torch.no_grad():
+            
+            head_or_tail = torch.randint(0, 2, (1,)) # If head_or_tail == True, corrupt the tail of the triple
+            head_or_tail = 1
+            corrupt_idx = 2 if head_or_tail else 0
+
+            sorted_databatch = self.role_batch_sorter(data, head_or_tail)
+
+            neg_candidates = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (sorted_databatch.shape[0], 1))
+
+            if head_or_tail == True:
+                corrupted_databatch = torch.cat((sorted_databatch[:, :2], neg_candidates), dim=1)
+                sorted_corrupted_databatch = self.role_batch_sorter(corrupted_databatch, head_or_tail)
+            else:
+                corrupted_databatch = torch.cat((neg_candidates, sorted_databatch[:, 1:]), dim=1)
+                sorted_corrupted_databatch = self.role_batch_sorter(corrupted_databatch, head_or_tail)
+
+            counter = 0
+            MAX_ITER = 50 # This is necessary to avoid non-terminating loops.
+            
+            if head_or_tail == True:
+                negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
+            else:
+                negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
+
+            #print(f'sorted_databatch: {sorted_databatch}')
+            #print(f'sorted CORRUPT databatch: {sorted_corrupted_databatch}')
+
+            while torch.any(negsamp_checker) and counter != MAX_ITER:
+                conflict_idcs = torch.where(negsamp_checker == True)[0]
+
+                for idx in conflict_idcs:
+                    sorted_corrupted_databatch[idx][corrupt_idx] = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (1,)).item()
+
+                negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
+                counter += 1
+
+
+                if counter == MAX_ITER:
+                    print('================Neg sampling ROLE loop limit reached====================')
+                    
+
+        return sorted_corrupted_databatch[:,corrupt_idx]
+
+        
+

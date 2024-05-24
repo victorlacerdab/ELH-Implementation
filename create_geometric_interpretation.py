@@ -26,11 +26,11 @@ and roles as class.
 '''
 
 def get_concept_names_idx_dict(canmodel):
-   conceptnames_idx_dict = {concept_name: idx for idx, concept_name in enumerate(CanonicalModel.concept_canonical_interpretation.keys())}
+   conceptnames_idx_dict = {concept_name: idx for idx, concept_name in enumerate(canmodel.concept_canonical_interpretation.keys())}
    return conceptnames_idx_dict
 
 def get_role_names_idx_dict(canmodel):
-    rolenames_idx_dict = {role_name: idx for idx, role_name in enumerate(CanonicalModel.role_canonical_interpretation.keys())}
+    rolenames_idx_dict = {role_name: idx for idx, role_name in enumerate(canmodel.role_canonical_interpretation.keys())}
     return rolenames_idx_dict
 
 def get_entities_idx_dict(canmodel):
