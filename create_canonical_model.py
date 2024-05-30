@@ -12,8 +12,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-# dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
-dir = '/Users/victorlacerda/Desktop/familyontologytest.owl'
+#dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
+#dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
+dir = '/Users/victorlacerda/Desktop/TestRole.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules
 
@@ -201,7 +202,7 @@ class CanonicalModel:
         
         # Second case from Definition 10
 
-        for restriction_name in self.concept_restrictions_dict.keys(): # Where restriction_name denotes a \exists r.B type of concept 'exists_' + self.concept.property.name + '.' + self.concept.value.name
+        for restriction_name in self.concept_restrictions_dict.keys(): # Where restriction_name denotes an \exists r.B type of concept 'exists_' + self.concept.property.name + '.' + self.concept.value.name
 
             #print(f'Restriction name init for loop: {restriction_name}')
             restriction_concept = self.concept_restrictions_dict[restriction_name].concept
@@ -215,7 +216,7 @@ class CanonicalModel:
                 super_superclasses = superclass.ancestors(include_self=True, include_constructs=True)
 
                 for super_superclass in super_superclasses:
-                    if type(super_superclass) == ThingClass:
+                    if type(super_superclass) == ThingClass and super_superclass:
                         c_D = super_superclass.name
                         CanonicalModel.role_canonical_interpretation[role_name_str].append((c_D, c_B))
 
@@ -283,8 +284,6 @@ def create_canonical_model(onto_dir, restrict_language_flag):
 
     with onto:
         sync_reasoner()
-        
-    #onto.save("inferences_goslimyeast.owl")
 
     gcas_iter = list(onto.general_class_axioms()) # Attention: this will not work unless the generator is converted into a list
     concept_names_iter = list(onto.classes())

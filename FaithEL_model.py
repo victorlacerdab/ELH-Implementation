@@ -14,7 +14,7 @@ import random
 
 from create_geometric_interpretation import SCALE_FACTOR, GeometricInterpretation
 
-torch.manual_seed(200)
+torch.manual_seed(33)
 
 class FaithEL(nn.Module):
     def __init__(self, emb_dim, phi, radius, gamma,
@@ -55,6 +55,7 @@ class FaithEL(nn.Module):
         with torch.no_grad():
             for role_name, role_idx in role_vocabulary.items():
                 self.role_embedding_dict.weight[role_idx] = torch.tensor(GeometricInterpretation.role_geointerps_dict[role_name].centroid)
+
     
     def forward(self, data):
     
@@ -69,8 +70,8 @@ class FaithEL(nn.Module):
             concept = data[:, concept_idx]
             subj_entity = data[:, subj_entity_idx]
 
-            #neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
-            neg_object_entity = self.negative_sampler_concept(data)
+            neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
+            #neg_object_entity = self.negative_sampler_concept(data)
 
             out1 = self.concept_embedding_dict(concept) # Concept parameter
             out2 = self.individual_embedding_dict(subj_entity) # Subject entity parameter
@@ -88,8 +89,8 @@ class FaithEL(nn.Module):
 
             subject_entity = data[:, subj_entity_idx]
             object_entity = data[:, obj_entity_idx]
-            #neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subject_entity.shape))
-            neg_object_entity = self.negative_sampler_role(data)
+            neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subject_entity.shape))
+            #neg_object_entity = self.negative_sampler_role(data)
 
             out1 = self.role_embedding_dict(role) # Role parameter embedding
             out2 = self.individual_embedding_dict(subject_entity)
@@ -204,11 +205,9 @@ class FaithEL(nn.Module):
                 negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
                 counter += 1
 
-
                 if counter == MAX_ITER:
                     print('================Neg sampling ROLE loop limit reached====================')
                     
-
         return sorted_corrupted_databatch[:,corrupt_idx]
 
         

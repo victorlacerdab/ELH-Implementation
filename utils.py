@@ -12,7 +12,7 @@ Computes hits@k for concept assertions.
 '''
 
 def get_hits_at_k_concept_assertions(model, GeoInterp_dataclass,
-                  test_concept_assertions, test_role_assertions,
+                  test_concept_assertions,
                   entity_to_idx_vocab: dict, idx_to_entity_vocab: dict,
                   idx_to_concept_vocab: dict, idx_to_role_vocab: dict,
                   centroid_score: False,
@@ -95,7 +95,7 @@ Computes hits@k for role assertions.
 '''
 
 def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
-                  test_concept_assertions, test_role_assertions,
+                  test_role_assertions,
                   entity_to_idx_vocab: dict, idx_to_entity_vocab: dict,
                   idx_to_concept_vocab: dict, idx_to_role_vocab: dict,
                   centroid_score = False
@@ -176,7 +176,6 @@ def get_hits_at_k_role_assertions(model, GeoInterp_dataclass,
                 pass
     
     hits_at_k = [round(sum(hit_values) / len(hit_values), 3) for hit_values in zip(*hits)]  # Calculate hits_at_k for each k
-
 
     return hits_at_k
 
@@ -374,12 +373,21 @@ def plot_score_hak(hits_at_k_concept, hits_at_k_roles, topk, num_epoch, eval_fre
 
 '''
 Helper function for computing concept assertion loss.
+    Args:
+        outputs1: The concept parameter;
+        outputs2: The individual's parameter;
+        outputs3: The negatively sampled individual:
+        labels: the centroid of the concept's geometric interpretation
+        loss_fn: selected metric, standard is MSE
+        gamma = Hyperparameter for weighting how far the individual parameters are allowed to move;
+        phi: Hyperparameter for weighting how far the role parameter is allowed to move;
+        neg_sampling: Flag for indicating whether negative sampling is used or not.
 '''
 
 def compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, gamma, phi, neg_sampling):
     
     if neg_sampling:
-        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels) + -torch.dist(outputs2, outputs3, p=2)
+        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels) + -loss_fn(outputs2, outputs3)
 
     else:
         loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels)
@@ -402,19 +410,26 @@ Args:
 
 def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, gamma, phi, neg_sampling):
     
-    if neg_sampling:
+    real_concat_no_detach = torch.cat((outputs2, outputs3), dim=1)
+    real_concat_tail_detach = torch.cat((outputs2, outputs3.detach()), dim=1)
+    real_concat_head_detach = torch.cat((outputs2.detach(), outputs3), dim=1)
+    tail_corrupted_concat = torch.cat((outputs2, outputs4), dim=1)
+    head_corrupted_concat = torch.cat((outputs4, outputs3), dim=1)
 
-        real_concat_no_detach = torch.cat((outputs2, outputs3), dim=1)
-        real_concat_tail_detach = torch.cat((outputs2, outputs3.detach()), dim=1)
-        real_concat_head_detach = torch.cat((outputs2.detach(), outputs3), dim=1)
-        tail_corrupted_concat = torch.cat((outputs2, outputs4), dim=1)
-        head_corrupted_concat = torch.cat((outputs4, outputs3), dim=1)
+    if neg_sampling:
 
         # The loss term is defined as the sum of the a) distance between the concat between (H,T) and the centroid of the role
         #                                            b) gamma-weighted distance between role parameter and (H,T) concat
         #                                            c) phi-weighted distance between role parameter and centroid
         #                                            d) negative distance between (H,T) concat and (H, Corrupt T) concat
         #                                            e) negative distance between (H,T) concat and (Corrupt H, T) concat
+        
+        #loss = (loss_fn(real_concat_no_detach, labels) +
+        #        gamma * loss_fn(outputs1, real_concat_no_detach) +
+        #        phi * loss_fn(outputs1, labels) +
+        #        - loss_fn(real_concat_no_detach, tail_corrupted_concat) +
+        #        - loss_fn(real_concat_no_detach, head_corrupted_concat)
+        #        )
 
         loss = (loss_fn(real_concat_head_detach, labels) +
                 loss_fn(real_concat_tail_detach, labels) + 
@@ -426,9 +441,11 @@ def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, g
                 - loss_fn(real_concat_head_detach, head_corrupted_concat) +
                 - loss_fn(real_concat_tail_detach, head_corrupted_concat)
                 )
-    
+        
     else:
-        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels)
+        loss = (loss_fn(real_concat_no_detach, labels) +
+                gamma * loss_fn(outputs1, real_concat_no_detach) +
+                phi * loss_fn(outputs1, labels))
 
     return loss
 
@@ -436,11 +453,34 @@ def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, g
 Main training loop.
 '''
 
-def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sampling = bool):
+def train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling: bool):
     model.train()
-    total_loss = 0.0
-    num_batches = len(concept_dataloader) + len(role_dataloader)
-    #num_batches = len(role_dataloader)
+    concept_loss = 0.0
+    total_samples = 0
+
+    for i, data in enumerate(concept_dataloader):
+
+        inputs, labels = data
+        optimizer.zero_grad()
+        outputs1, outputs2, outputs3, _ = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate, out4 = None
+
+        loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
+
+        loss.backward()
+        optimizer.step()
+        concept_loss += loss.item()
+        samples_num = inputs.size(0)
+        total_samples += samples_num
+
+    # model.concept_parameter_constraint()
+
+    return concept_loss, total_samples
+
+def train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
+
+    model.train()
+    role_loss = 0.0
+    total_samples = 0
 
     for i, data in enumerate(role_dataloader):
         model.train()
@@ -449,38 +489,58 @@ def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sa
         outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs1 = Role Parameter, outputs2 = SubjEntity, out3 = HeadEntity, outputs4 = neg_candidate
 
         loss = compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, model.gamma, model.phi, neg_sampling)
-
-        loss.backward()
-        optimizer.step()
-        total_loss += loss.item()
-
-        # model.role_parameter_constraint()
-
-    for i, data in enumerate(concept_dataloader):
-        model.train()
-        inputs, labels = data
-        optimizer.zero_grad()
-        outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate, out4 = None
-
-        loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
             
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
+        role_loss += loss.item()
+        samples_num = inputs.size(0)
+        total_samples += samples_num
 
-        # model.concept_parameter_constraint()
+    # model.role_parameter_constraint()
 
-    return total_loss / num_batches
+    return role_loss, total_samples
+
+def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
+    model.train()
+    total_loss = 0.0
+
+    concept_loss, concept_samples = train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling)
+    role_loss, role_samples = train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling)
+
+    total_loss = concept_loss + role_loss
+    num_samples = concept_samples + role_samples
+
+    return total_loss / num_samples
 
 ''' 
-Function for obtaining test loss.
+Functions for obtaining test loss.
 '''
 
-def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling = bool):
+def test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling: bool):
+    
     model.eval()
-    total_loss = 0.0
-    num_batches = len(concept_dataloader) + len(role_dataloader)
-    #num_batches = len(role_dataloader)
+    test_concept_loss = 0.0
+    total_samples = 0
+
+    with torch.no_grad():
+
+        for i, data in enumerate(concept_dataloader):
+            inputs, labels = data
+            outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs1 = Role Parameter, outputs2 = SubjEntity, out3 = HeadEntity, outputs4 = neg_candidate
+            
+            loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
+
+            test_concept_loss += loss.item()
+            samples_num = inputs.size(0)
+            total_samples += samples_num
+
+    return test_concept_loss, total_samples
+
+def test_role_loss(model, role_dataloader, loss_fn, neg_sampling: bool):
+
+    model.eval()
+    test_role_loss = 0.0
+    total_samples = 0
 
     with torch.no_grad():
 
@@ -490,21 +550,30 @@ def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling = boo
             
             loss = compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, model.gamma, model.phi, neg_sampling)
 
-            total_loss += loss.item()
+            test_role_loss += loss.item()
+            samples_num = inputs.size(0)
+            total_samples += samples_num
 
-        for i, data in enumerate(concept_dataloader):
-            inputs, labels = data
-            outputs1, outputs2, outputs3, _ = model(inputs) # Outputs 1 = Concept Parameter, Outputs 2 = Entity Parameter, Outputs 3 = neg_candidate, out4 = None
+    return test_role_loss, total_samples
 
-            loss = compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, model.gamma, model.phi, neg_sampling)
-                
-            total_loss += loss.item()
+'''
+Function call for obtaining test loss for concept and role assertions sequentially.
+'''
+def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling: bool):
+    model.eval()
+    total_loss = 0.0
+    num_batches = len(concept_dataloader) + len(role_dataloader)
 
-    return total_loss / num_batches
+    concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
+    role_test_loss, role_samples = test_role_loss(model, role_dataloader, loss_fn, neg_sampling)
+
+    total_samples = concept_samples + role_samples
+    total_loss = concept_test_loss + role_test_loss
+
+    return total_loss / total_samples
 
 '''
 Main function for training.
-
 GeoInterp_dataclass: we need to pass the GeometricInterpretation class to the model, to the evaluation functions, and to the plotting functions.
 '''
 
@@ -546,7 +615,7 @@ def train_model(model, GeoInterp_dataclass,
             print(f'Epoch {epoch}: Initiating evaluation. \n')
 
             try:
-                test_hak_concept = get_hits_at_k_concept_assertions(model, GeoInterp_dataclass, test_concept_dset, test_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
+                test_hak_concept = get_hits_at_k_concept_assertions(model, GeoInterp_dataclass, test_concept_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
                 test_hits_at_k_concept.append(test_hak_concept)
             except:
                 print('Exception found. H@K for the Concept Test Dataset have not been computed.')
@@ -554,14 +623,14 @@ def train_model(model, GeoInterp_dataclass,
 
             if eval_train == True:
                 try:
-                    train_hak_concept = get_hits_at_k_concept_assertions(model, GeoInterp_dataclass, train_concept_dset, train_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
+                    train_hak_concept = get_hits_at_k_concept_assertions(model, GeoInterp_dataclass, train_concept_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
                     train_hits_at_k_concept.append(train_hak_concept)
                 except:
                     print('Exception found. H@K for the Concept Train Dataset have not been computed.')
                     pass
             
             try:
-                test_hak_role = get_hits_at_k_role_assertions(model, GeoInterp_dataclass, test_concept_dset, test_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
+                test_hak_role = get_hits_at_k_role_assertions(model, GeoInterp_dataclass, test_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
                 test_hits_at_k_role.append(test_hak_role)
             except:
                 print('Exception found. H@K for the Role Test Dataset have not been computed.')
@@ -569,7 +638,7 @@ def train_model(model, GeoInterp_dataclass,
             
             if eval_train == True:
                 try:
-                    train_hak_role = get_hits_at_k_role_assertions(model, GeoInterp_dataclass, train_concept_dset, train_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
+                    train_hak_role = get_hits_at_k_role_assertions(model, GeoInterp_dataclass, train_role_dset, entity_to_idx, idx_to_entity, idx_to_concept, idx_to_role, centroid_score)
                     train_hits_at_k_role.append(train_hak_role)
                 except:
                     print('Exception found. H@K for the Role Train Dataset have not been computed.')

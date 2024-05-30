@@ -16,7 +16,7 @@ import random
 from create_canonical_model import CanonicalModel, dir
 from create_geometric_interpretation import idx_finder_dict, EMB_DIM, SCALE_FACTOR, GeometricInterpretation, EntityEmbedding
 
-torch.manual_seed(200)
+torch.manual_seed(33)
 
 TRAIN_SIZE_PROPORTION = 0.7 # Controls the proportion of training and test sets
 BATCH_SIZE = 512 # Desired batch size
@@ -99,7 +99,6 @@ def get_abox_dataset(ontology_dir: str,
     y_roles = []
 
     entities = [entity.name for entity in list(ontology.individuals())]
-    entitiesprime = [entity + '_prime' for entity in entities]
     
     concept_to_idx_vocab = concept_to_idx
     idx_to_concept_vocab = {value: key for key, value in concept_to_idx_vocab.items()}
@@ -196,6 +195,7 @@ X_concepts, X_roles, y_concepts, y_roles, entity_to_idx_vocab, idx_to_entity_voc
                                                                                                                                                                                         CanonicalModel, EntityEmbedding
                                                                                                                                                                                         )
 
+
 class OntologyDataset(Dataset):
     def __init__(self, data, labels):
         self.X = torch.tensor(data, dtype=torch.long)
@@ -222,9 +222,11 @@ train_size = int(TRAIN_SIZE_PROPORTION * dataset_size)
 test_size = dataset_size - train_size
 trainRoleDataset, testRoleDataset = torch.utils.data.random_split(RoleDataset, [train_size, test_size])
 
+ConceptDataLoader = DataLoader(ConceptDataset, batch_size = BATCH_SIZE, shuffle=True)
 train_ConceptDataLoader = DataLoader(trainConceptDataset, batch_size = BATCH_SIZE, shuffle=True)
 test_ConceptDataLoader = DataLoader(testConceptDataset, batch_size = BATCH_SIZE, shuffle=True)
 
+RoleDataLoader = DataLoader(RoleDataset, batch_size = BATCH_SIZE, shuffle=True)
 train_RoleDataLoader = DataLoader(trainRoleDataset, batch_size = BATCH_SIZE, shuffle=True)
 test_RoleDataLoader = DataLoader(testRoleDataset, batch_size = BATCH_SIZE, shuffle=True)
 

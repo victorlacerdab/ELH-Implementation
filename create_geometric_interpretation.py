@@ -88,13 +88,18 @@ class EntityEmbedding:
         EntityEmbedding.entity_entityvector_dict[self.name] = []
 
         # Applies the embedding function to the concept names portion of the definition
-
+        print(f'Embedding Entity from the Domain Self name: {self.name}')
         for concept_name in EntityEmbedding.concept_canonical_interpretation_dict:
             concept_name_idx = EntityEmbedding.concept_names_idx_dict[concept_name]
-        
+            print(f'Currently understanding whether {self.name} is in the interpretation of {concept_name}')
+
+            print(f'Condition {self.name} in EntityEmbedding.concept_canonical_interpretation_dict[{concept_name}]: {self.name in EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
+            print(f'EntityEmbedding.concept_canonical_interpretation_dict[{concept_name}]: {EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
             if self.name in EntityEmbedding.concept_canonical_interpretation_dict[concept_name]:
+                print(f'{concept_name}s interpretation: {EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
                 embedding_vector[concept_name_idx] = 1 * self.scale_factor
                 self.in_interpretation_of.append(concept_name)
+            print('')
 
         # Applies the embedding function to the role names portion of the definition
                 
@@ -103,11 +108,9 @@ class EntityEmbedding:
         for role_name in EntityEmbedding.role_canonical_interpretation_dict:
 
             if self.restrict_language_flag == False:
-            
                 role_name_idx = len(EntityEmbedding.concept_names_idx_dict) + (EntityEmbedding.role_names_idx_dict[role_name] * len(EntityEmbedding.entities_idx_dict)) # Entities dict indexes on the domain of the canonical model
 
             else:
-
                 role_name_idx = len(EntityEmbedding.concept_names_idx_dict) + EntityEmbedding.role_names_idx_dict[role_name]
             
             #print(f'This is the role name {role_name}\n This is the role_name_idx {role_name_idx}')
@@ -248,6 +251,26 @@ def index_finder(emb_dim, restrict_language_flag, concept_name_idx_dict, role_na
                 index_dict[final_role_entity_pair_idx] = (role, entity)
        
     return index_dict
+
+''' 
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+POSSIVEL ERRO
+ 
+ |
+ |
+\ /
+ ^
+'''
 
 def get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddings_list, entity_dims_index_dict, emb_dim, canmodel: CanonicalModel):
 
