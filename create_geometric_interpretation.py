@@ -12,9 +12,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-from create_canonical_model import RESTRICT_LANGUAGE, canmodel, CanonicalModel # Creates the canonical model and stores it in the 'canmodel' variable
+from create_canonical_model import RESTRICT_LANGUAGE, INCLUDE_TOP, canmodel, CanonicalModel # Creates the canonical model and stores it in the 'canmodel' variable
 
 SCALE_FACTOR = 10 # Controls the one-hot encoding factor for the embedding function. It means the "one-hot" dimensions will have the chosen value.
+INCLUDE_TOP = INCLUDE_TOP
 
 '''
 Utility functions for initializing
@@ -88,18 +89,14 @@ class EntityEmbedding:
         EntityEmbedding.entity_entityvector_dict[self.name] = []
 
         # Applies the embedding function to the concept names portion of the definition
-        print(f'Embedding Entity from the Domain Self name: {self.name}')
         for concept_name in EntityEmbedding.concept_canonical_interpretation_dict:
             concept_name_idx = EntityEmbedding.concept_names_idx_dict[concept_name]
-            print(f'Currently understanding whether {self.name} is in the interpretation of {concept_name}')
 
-            print(f'Condition {self.name} in EntityEmbedding.concept_canonical_interpretation_dict[{concept_name}]: {self.name in EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
-            print(f'EntityEmbedding.concept_canonical_interpretation_dict[{concept_name}]: {EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
             if self.name in EntityEmbedding.concept_canonical_interpretation_dict[concept_name]:
-                print(f'{concept_name}s interpretation: {EntityEmbedding.concept_canonical_interpretation_dict[concept_name]}')
                 embedding_vector[concept_name_idx] = 1 * self.scale_factor
                 self.in_interpretation_of.append(concept_name)
-            print('')
+        
+        # embedding_vector[0] = 0
 
         # Applies the embedding function to the role names portion of the definition
                 
@@ -134,6 +131,8 @@ class EntityEmbedding:
 
         #print(f'========================================================\n')
         # EntityEmbedding.entity_entityvector_dict[self.name].append(embedding_vector)
+        if self.name == 'Thing':
+            embedding_vector = np.zeros(np.shape(embedding_vector))
         EntityEmbedding.entity_entityvector_dict[self.name] = embedding_vector
 
         return embedding_vector
@@ -161,9 +160,15 @@ def get_domain_embeddings(emb_dim, restrict_language_flag, scale_factor):
    # The entities in the domain are strings
     
     for entity_name in EntityEmbedding.domain_dict:
-       embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
-       embedded_entities.append(embedded_entity)
-       counter += 1
+       if entity_name == 'Thing':
+           embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
+           embedded_entity.embedding_vector = np.zeros(np.shape(embedded_entity.embedding_vector))
+           embedded_entities.append(embedded_entity)
+           counter += 1
+       else:
+           embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
+           embedded_entities.append(embedded_entity)
+           counter += 1
        
        if counter % 1000 == 0:
            print(counter)
@@ -277,6 +282,7 @@ def get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddi
     faithful_concept_geometric_interps = []
 
     for concept_name in concept_names_interps.keys():
+        # print(f'Creating geometric interpretation for {concept_name}')
         concept_name = GeometricInterpretation(concept_name, emb_dim)
 
         for embedding in domain_embeddings_list:
@@ -284,6 +290,7 @@ def get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddi
                 concept_name.vertices.append(embedding.embedding_vector)
             
         GeometricInterpretation.concept_geointerps_dict[concept_name.name] = concept_name
+
         if concept_name.name == 'Thing':
             concept_name.centroid = np.zeros((concept_name.emb_dim,))
         else:
@@ -368,9 +375,8 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
         print(f'Final embedding dimension: {EMB_DIM}')
         print(f'The final dimension for role regions is: {EMB_DIM * 2}')
 
-
     domain_embeddings_list = get_domain_embeddings(EMB_DIM, RESTRICT_LANGUAGE, SCALE_FACTOR) # This function initializes the vectors with 0 and one-hot encodes them according to \mu
-    
+
     concept_names_ordering = EntityEmbedding.concept_names_idx_dict
     role_names_ordering = EntityEmbedding.role_names_idx_dict
     entities_ordering = EntityEmbedding.entities_idx_dict

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import random
 
 from create_canonical_model import CanonicalModel, dir
-from create_geometric_interpretation import idx_finder_dict, EMB_DIM, SCALE_FACTOR, GeometricInterpretation, EntityEmbedding
+from create_geometric_interpretation import idx_finder_dict, INCLUDE_TOP, EMB_DIM, SCALE_FACTOR, GeometricInterpretation, EntityEmbedding
 
 torch.manual_seed(33)
 
@@ -35,7 +35,7 @@ test_role_loader_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementatio
 Function for generating 
 '''
 
-def get_restriction_vertices(restriction_concept, concept_geointerps_dict, role_geointerps_dict, index_finder_dict, CanonicalModel: CanonicalModel, EntityEmbedding: EntityEmbedding):
+def get_restriction_vertices(restriction_concept, concept_geointerps_dict, role_geointerps_dict, index_finder_dict, CanonicalModel: CanonicalModel, EntityEmbedding: EntityEmbedding, include_top_flag):
     
     concept_name = restriction_concept.value
     role_name = restriction_concept.property
@@ -87,8 +87,9 @@ Distinguishes between concept assertions and role assertions.
 def get_abox_dataset(ontology_dir: str,
                      concept_geointerps_dict: dict, role_geointerps_dict: dict,
                      concept_to_idx: dict, role_to_idx: dict,
-                     index_finder_dict: dict, emb_dim = int,
-                     CanonicalModel = CanonicalModel, EntityEmbedding = EntityEmbedding):
+                     index_finder_dict: dict, emb_dim: int,
+                     CanonicalModel: CanonicalModel, EntityEmbedding: EntityEmbedding,
+                     include_top_flag: bool):
     
     ontology = get_ontology(ontology_dir)
     ontology = ontology.load()
@@ -111,10 +112,25 @@ def get_abox_dataset(ontology_dir: str,
 
     for individual in list(ontology.individuals()):
 
-        all_facts = individual.INDIRECT_is_a
+        if include_top_flag == True:
+            all_facts = individual.INDIRECT_is_a
+        else:
+            preprocessed_all_facts = individual.INDIRECT_is_a
+            all_facts = []
+            
+            for fact in preprocessed_all_facts:
+                if type(fact) == ThingClass and fact.name == 'Thing':
+                    pass
+                elif type(fact) == And and (fact.Classes[0].name == 'Thing' or fact.Classes[1].name == 'Thing'):
+                    pass
+                elif type(fact) == Restriction and fact.value.name == 'Thing':
+                    pass
+                else:
+                    all_facts.append(fact)
 
         for concept in all_facts:
             # Handles concepts of the type A
+
             if type(concept) == ThingClass:
                 concept = concept_geointerps_dict[concept.name]
                 fact = np.array([concept_to_idx_vocab[concept.name], entity_to_idx_vocab[individual.name]])
@@ -141,7 +157,7 @@ def get_abox_dataset(ontology_dir: str,
                     y_label = np.array((concept1.centroid + concept2.centroid)/2) # The golden label for an intersection is just the average of the centroid of the two regions
                     X_concepts.append(fact)
                     y_concepts.append(y_label)
-            
+
             # Handles concepts of the type \exists r.B
             elif type(concept) == Restriction:
                 concept_name = concept.value
@@ -160,7 +176,8 @@ def get_abox_dataset(ontology_dir: str,
                     idx_to_concept_vocab[len(concept_to_idx_vocab)-1] = restriction_name
                     restriction_concept = GeometricInterpretation(restriction_name, EMB_DIM) # Initializes a Geometric Interpretation type object
                     restriction_concept.vertices = get_restriction_vertices(concept, concept_geointerps_dict,
-                                                                            role_geointerps_dict, index_finder_dict, CanonicalModel, EntityEmbedding)
+                                                                            role_geointerps_dict, index_finder_dict, CanonicalModel, EntityEmbedding,
+                                                                            include_top_flag)
                     
                     GeometricInterpretation.concept_geointerps_dict[restriction_name] = restriction_concept
                     restriction_concept.centroid = restriction_concept.get_centroid_naive()
@@ -192,9 +209,9 @@ X_concepts, X_roles, y_concepts, y_roles, entity_to_idx_vocab, idx_to_entity_voc
                                                                                                                                                                                         EntityEmbedding.role_names_idx_dict,
                                                                                                                                                                                         idx_finder_dict,
                                                                                                                                                                                         EMB_DIM,
-                                                                                                                                                                                        CanonicalModel, EntityEmbedding
+                                                                                                                                                                                        CanonicalModel, EntityEmbedding,
+                                                                                                                                                                                        INCLUDE_TOP
                                                                                                                                                                                         )
-
 
 class OntologyDataset(Dataset):
     def __init__(self, data, labels):

@@ -13,10 +13,11 @@ import matplotlib.pyplot as plt
 import random
 
 #dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
-#dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
-dir = '/Users/victorlacerda/Desktop/TestRole.owl'
+dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
+#dir = '/Users/victorlacerda/Desktop/TestRole.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules
+INCLUDE_TOP = False
 
 '''
 Class for creating entities to
@@ -65,17 +66,17 @@ class CanonicalModelElements:
             CanonicalModelElements.concept_intersections[self.name] = self
             CanonicalModelElements.all_concepts[self.name] = self
 
-def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, restrict_language = False):
+def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, restrict_language = False, include_top = True):
     
     onto = ontology
-    top = owl.Thing
-    #bottom = owl.Nothing
 
-    CanonicalModelElements(top)
-    #CanonicalModelElements(bottom)
+    if include_top == True:
+        top = owl.Thing
+        CanonicalModelElements(top)
+        #bottom = owl.Nothing
+        #CanonicalModelElements(bottom)
 
     for concept_name in concept_names_iter:
-        
         CanonicalModelElements(concept_name)
 
         if restrict_language == False:
@@ -93,11 +94,14 @@ def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, 
     print('All Concept Names and Concept Intersections have been preprocessed for the creation of the canonical model.')
     print('===========================================================================================================')
 
-    concept_names_iter.append(top)
-    #concept_names_iter.append(bottom)
+    if include_top == True:
+        concept_names_iter.append(top)
+        #concept_names_iter.append(bottom)
+    else:
+        print('Top is not being included in the canonical model.')
+        pass
 
     if restrict_language == False:
-
         for role_name in role_names_iter:
             for concept_name in concept_names_iter:
                 with onto:
@@ -107,13 +111,15 @@ def get_canonical_model_elements(concept_names_iter, role_names_iter, ontology, 
                 CanonicalModelElements(gca.left_side)
     
     else:
-
-        for role_name in role_names_iter:
-            with onto:
-                gca = GeneralClassAxiom(role_name.some(owl.Thing))
-                gca.is_a.append(role_name.some(owl.Thing))
-
-                CanonicalModelElements(gca.left_side)
+        if include_top == True:
+            for role_name in role_names_iter:
+                with onto:
+                    gca = GeneralClassAxiom(role_name.some(owl.Thing))
+                    gca.is_a.append(role_name.some(owl.Thing))
+                    CanonicalModelElements(gca.left_side)
+        else:
+            print(f'Top must be included when restricting the language. Terminating the creation of the canonical model.')
+            sys.exit(1)
             
     print('')
     print('All restrictions have been preprocessed for the creation of the canonical model.')
@@ -138,12 +144,13 @@ class CanonicalModel:
     concept_canonical_interpretation = {}
     role_canonical_interpretation = {}
 
-    def __init__(self, concept_names_dict, concept_intersections_dict, concept_restrictions_dict, all_concepts_dict, role_names_iter):
+    def __init__(self, concept_names_dict, concept_intersections_dict, concept_restrictions_dict, all_concepts_dict, role_names_iter, include_top_flag):
         
         self.domain = all_concepts_dict
         self.concept_names_dict = concept_names_dict
         self.concept_restrictions_dict = concept_restrictions_dict
         self.concept_intersections_dict = concept_intersections_dict
+        self.include_top = include_top_flag
 
         self.role_names_iter = role_names_iter
 
@@ -159,12 +166,21 @@ class CanonicalModel:
         for concept in self.concept_names_dict.keys():
 
             CanonicalModel.concept_canonical_interpretation[concept] = []
-            superclasses = self.domain[concept].concept.ancestors(include_self=True, include_constructs=True) # The self.domain[concept] is used to access the CanonicalModelElements type of object,
-                                                                                                               # and the attribute .concept is used to access the concept in owlready2 format                                                            
+            if self.include_top == True:
+                superclasses = self.domain[concept].concept.ancestors(include_self=True, include_constructs=True) # The self.domain[concept] is used to access the CanonicalModelElements type of object,
+                                                                                                                  # and the attribute .concept is used to access the concept in owlready2 format
+
+            else:
+                superclasses = list(self.domain[concept].concept.ancestors(include_self=True, include_constructs=True))
+                print(concept, superclasses)
+                superclasses = [superclass for superclass in superclasses if type(superclass) == ThingClass and superclass.name != 'Thing']
+
             for superclass in superclasses:
 
                 if type(superclass) == ThingClass:
                     CanonicalModel.concept_canonical_interpretation[concept].append(superclass.name)
+                    if superclass != owl.Thing:
+                        CanonicalModel.concept_canonical_interpretation[concept].append('And_' + ''.join(sorted(superclass.name + superclass.name)))
 
                 elif type(superclass) == Restriction:
                     CanonicalModel.concept_canonical_interpretation[concept].append('exists_' + superclass.property.name + '.' + superclass.value.name)
@@ -204,10 +220,10 @@ class CanonicalModel:
 
         for restriction_name in self.concept_restrictions_dict.keys(): # Where restriction_name denotes an \exists r.B type of concept 'exists_' + self.concept.property.name + '.' + self.concept.value.name
 
-            #print(f'Restriction name init for loop: {restriction_name}')
+            # print(f'Restriction name init for loop: {restriction_name}')
             restriction_concept = self.concept_restrictions_dict[restriction_name].concept
             c_B = self.concept_restrictions_dict[restriction_name].concept.value.name
-            #print(f'c_B: {c_B}\n')
+            # print(f'c_B: {c_B}\n')
 
             superclasses = restriction_concept.ancestors(include_self=True, include_constructs=False)
 
@@ -216,7 +232,7 @@ class CanonicalModel:
                 super_superclasses = superclass.ancestors(include_self=True, include_constructs=True)
 
                 for super_superclass in super_superclasses:
-                    if type(super_superclass) == ThingClass and super_superclass:
+                    if type(super_superclass) == ThingClass:
                         c_D = super_superclass.name
                         CanonicalModel.role_canonical_interpretation[role_name_str].append((c_D, c_B))
 
@@ -235,7 +251,7 @@ class CanonicalModel:
                     
                 superclasses = self.domain[restriction_name].concept.ancestors(include_self=True, include_constructs=False) # Include_constructs is turned to false due to the definition of canonical model
 
-                #print(f'These are the superclasses of the restriction_name {restriction_name}:" {superclasses}')
+                # print(f'These are the superclasses of the restriction_name {restriction_name}:" {superclasses}')
 
                 for superclass in superclasses:
                     super_superclasses = superclass.ancestors(include_self=True, include_constructs=True)
@@ -267,7 +283,7 @@ Main function for creating the canonical model.
         from the CanonicalModel class.
 '''
 
-def create_canonical_model(onto_dir, restrict_language_flag):
+def create_canonical_model(onto_dir: str, restrict_language_flag: bool, include_top_flag: bool):
 
     onto = get_ontology(onto_dir)
     onto = onto.load()
@@ -277,7 +293,7 @@ def create_canonical_model(onto_dir, restrict_language_flag):
     concept_names_iter = list(onto.classes())
     role_names_iter = list(onto.properties())
 
-    get_canonical_model_elements(concept_names_iter, role_names_iter, onto, restrict_language_flag)
+    get_canonical_model_elements(concept_names_iter, role_names_iter, onto, restrict_language_flag, include_top_flag)
 
     print('============================================================================')
     print('Starting to reason.\n')
@@ -293,7 +309,7 @@ def create_canonical_model(onto_dir, restrict_language_flag):
     print('')
     print('============================================================================')
     print('Done reasoning. Creating the canonical model.')
-    canmodel = CanonicalModel(CanonicalModelElements.concept_names, CanonicalModelElements.concept_intersections, CanonicalModelElements.concept_restrictions, CanonicalModelElements.all_concepts, role_names_iter)
+    canmodel = CanonicalModel(CanonicalModelElements.concept_names, CanonicalModelElements.concept_intersections, CanonicalModelElements.concept_restrictions, CanonicalModelElements.all_concepts, role_names_iter, INCLUDE_TOP)
     print('============================================================================\n')
     print('Concluded creating canonical model.')
 
@@ -301,4 +317,4 @@ def create_canonical_model(onto_dir, restrict_language_flag):
 
 # Instantiates the canonical model
 
-canmodel = create_canonical_model(dir, RESTRICT_LANGUAGE)
+canmodel = create_canonical_model(dir, RESTRICT_LANGUAGE, INCLUDE_TOP)
