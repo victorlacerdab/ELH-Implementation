@@ -171,7 +171,10 @@ class FaithEL(nn.Module):
         with torch.no_grad():
             
             head_or_tail = torch.randint(0, 2, (1,)) # If head_or_tail == True, corrupt the tail of the triple
-            head_or_tail = 1
+            
+            ''' HARDCODED FOR THE TIME BEING'''
+            
+            head_or_tail = 1 
             corrupt_idx = 2 if head_or_tail else 0
 
             sorted_databatch = self.role_batch_sorter(data, head_or_tail)
@@ -186,15 +189,12 @@ class FaithEL(nn.Module):
                 sorted_corrupted_databatch = self.role_batch_sorter(corrupted_databatch, head_or_tail)
 
             counter = 0
-            MAX_ITER = 50 # This is necessary to avoid non-terminating loops.
+            MAX_ITER = 100 # This is necessary to avoid non-terminating loops.
             
             if head_or_tail == True:
                 negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
             else:
                 negsamp_checker = sorted_databatch[:,corrupt_idx] == sorted_corrupted_databatch[:,corrupt_idx]
-
-            #print(f'sorted_databatch: {sorted_databatch}')
-            #print(f'sorted CORRUPT databatch: {sorted_corrupted_databatch}')
 
             while torch.any(negsamp_checker) and counter != MAX_ITER:
                 conflict_idcs = torch.where(negsamp_checker == True)[0]

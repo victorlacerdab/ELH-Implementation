@@ -17,7 +17,7 @@ dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
 #dir = '/Users/victorlacerda/Desktop/TestRole.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules
-INCLUDE_TOP = False
+INCLUDE_TOP = True
 
 '''
 Class for creating entities to
@@ -172,7 +172,6 @@ class CanonicalModel:
 
             else:
                 superclasses = list(self.domain[concept].concept.ancestors(include_self=True, include_constructs=True))
-                print(concept, superclasses)
                 superclasses = [superclass for superclass in superclasses if type(superclass) == ThingClass and superclass.name != 'Thing']
 
             for superclass in superclasses:

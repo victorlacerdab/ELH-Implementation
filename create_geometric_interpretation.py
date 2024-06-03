@@ -26,8 +26,14 @@ interpretation of concepts
 and roles as class.
 '''
 
-def get_concept_names_idx_dict(canmodel):
+def get_concept_names_idx_dict(canmodel, include_top_flag):
+   
    conceptnames_idx_dict = {concept_name: idx for idx, concept_name in enumerate(canmodel.concept_canonical_interpretation.keys())}
+
+   if include_top_flag == True:
+       conceptnames_idx_dict = {concept_name: idx-1 for idx, concept_name in enumerate(canmodel.concept_canonical_interpretation.keys())}
+       conceptnames_idx_dict.pop('Thing')
+       
    return conceptnames_idx_dict
 
 def get_role_names_idx_dict(canmodel):
@@ -54,15 +60,21 @@ class EntityEmbedding:
     # Dictionaries for storing the indices of concept names and role names, entities pairs, respectively
     # Keys are strings and values are integers
     
-    concept_names_idx_dict = get_concept_names_idx_dict(canmodel)
+    concept_names_idx_dict = get_concept_names_idx_dict(canmodel, INCLUDE_TOP)
     role_names_idx_dict = get_role_names_idx_dict(canmodel)
     entities_idx_dict = get_entities_idx_dict(canmodel)
 
     # Dictionaries accessing the canonical interpretation of concepts and roles
     # Keys and values are strings
     
-    concept_canonical_interpretation_dict = CanonicalModel.concept_canonical_interpretation
-    role_canonical_interpretation_dict = CanonicalModel.role_canonical_interpretation
+    if INCLUDE_TOP == True:
+        concept_canonical_interpretation_dict = CanonicalModel.concept_canonical_interpretation.copy()
+        concept_canonical_interpretation_dict.pop('Thing')
+        role_canonical_interpretation_dict = CanonicalModel.role_canonical_interpretation
+    else:
+        concept_canonical_interpretation_dict = CanonicalModel.concept_canonical_interpretation
+        role_canonical_interpretation_dict = CanonicalModel.role_canonical_interpretation
+
 
     # Dictionary storing the domain of the canonical model being embedded
     # IMPORTANT: Keys are strings and values are CanonicalModelElements type objects
@@ -75,18 +87,21 @@ class EntityEmbedding:
 
     entity_entityvector_dict = dict.fromkeys(domain_dict.keys())
 
-    def __init__(self, entity_name, emb_dim, restrict_language_flag, scale_factor):
+    def __init__(self, entity_name, emb_dim, restrict_language_flag, include_top_flag, scale_factor):
         self.name = entity_name
         self.emb_dim = emb_dim
         self.scale_factor = scale_factor
         self.in_interpretation_of = []
         self.restrict_language_flag = restrict_language_flag
+        self.include_top_flag = include_top_flag
         self.embedding_vector = self.get_embedding_vector()
 
     def get_embedding_vector(self):
         
         embedding_vector = np.zeros((self.emb_dim,))
         EntityEmbedding.entity_entityvector_dict[self.name] = []
+
+        # print(EntityEmbedding.concept_canonical_interpretation_dict)
 
         # Applies the embedding function to the concept names portion of the definition
         for concept_name in EntityEmbedding.concept_canonical_interpretation_dict:
@@ -148,7 +163,7 @@ each element of the domain of the canonical interpretation.
     The embedded_entities are also available in the dictionary EntityEmbeddings.entity_entityvector_dict
 '''
 
-def get_domain_embeddings(emb_dim, restrict_language_flag, scale_factor):
+def get_domain_embeddings(emb_dim, restrict_language_flag, scale_factor, include_top_flag):
 
     embedded_entities = []
     counter = 0
@@ -156,7 +171,7 @@ def get_domain_embeddings(emb_dim, restrict_language_flag, scale_factor):
    # The entities in the domain are strings
     
     for entity_name in EntityEmbedding.domain_dict:
-        embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
+        embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, include_top_flag, scale_factor)
         embedded_entities.append(embedded_entity)
         counter += 1
        
@@ -184,6 +199,10 @@ values in a class variable dictionary.
 class GeometricInterpretation:
 
     concept_geointerps_dict = dict.fromkeys(CanonicalModel.concept_canonical_interpretation.keys())
+
+    if INCLUDE_TOP == True:
+        concept_geointerps_dict.update({'Thing': None})
+
     role_geointerps_dict = dict.fromkeys(CanonicalModel.role_canonical_interpretation.keys())
 
     def __init__(self, name, emb_dim):
@@ -196,7 +215,12 @@ class GeometricInterpretation:
             GeometricInterpretation.concept_geointerps_dict[name] = []
 
     def get_centroid_naive(self):
-        if len(self.vertices) == 0 and self.name in self.concept_geointerps_dict.keys():
+
+        if self.name == 'Thing':
+            centroid = np.zeros((self.emb_dim),)
+            return centroid
+        
+        elif len(self.vertices) == 0 and self.name in self.concept_geointerps_dict.keys():
             centroid = np.zeros((self.emb_dim,))
             return centroid
         
@@ -247,32 +271,13 @@ def index_finder(emb_dim, restrict_language_flag, concept_name_idx_dict, role_na
        
     return index_dict
 
-''' 
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
-POSSIVEL ERRO
- 
- |
- |
-\ /
- ^
-'''
 
 def get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddings_list, entity_dims_index_dict, emb_dim, canmodel: CanonicalModel):
 
     faithful_concept_geometric_interps = []
 
     for concept_name in concept_names_interps.keys():
-        # print(f'Creating geometric interpretation for {concept_name}')
+        #print(f'Creating geometric interpretation for {concept_name}')
         concept_name = GeometricInterpretation(concept_name, emb_dim)
 
         for embedding in domain_embeddings_list:
@@ -328,7 +333,7 @@ def get_faithful_role_geometric_interps(role_names_interps, entity_embeddings_li
 
 # The default for the scale_factor is 1 to create binary vectors.
 
-def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_flag=bool, scale_factor = 1):
+def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_flag: bool, include_top_flag: bool, scale_factor = 1):
 
     domain = canonical_model.domain # Keys are strings and values are CanonicalModelElements type objects
     concept_names_interps = canonical_model.concept_canonical_interpretation # Keys are strings and values are lists of strings.
@@ -336,10 +341,14 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
 
     SCALE_FACTOR = scale_factor
     RESTRICT_LANGUAGE = restrict_language_flag
+    INCLUDE_TOP = include_top_flag
     
     if restrict_language_flag == False:
 
-        EMB_DIM = len(concept_names_interps) + len(role_names_interps) * len(domain)
+        if include_top_flag == False:
+            EMB_DIM = len(concept_names_interps) + len(role_names_interps) * len(domain)
+        else:
+            EMB_DIM = (len(concept_names_interps) + len(role_names_interps) * len(domain))-1
 
         print('================EMBEDDING DIMENSION================')
         print(f'Concept Name dimensions: {len(concept_names_interps)}')
@@ -353,10 +362,16 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
 
     else:
 
-        EMB_DIM = len(concept_names_interps) + len(role_names_interps) * len(domain)
+        if include_top_flag == False:
+            EMB_DIM = len(concept_names_interps) + len(role_names_interps) * len(domain)
+        else:
+            EMB_DIM = (len(concept_names_interps) + len(role_names_interps) * len(domain))-1
         
         print('================EMBEDDING DIMENSION================')
-        print(f'Concept Name dimensions: {len(concept_names_interps)}')
+        if include_top_flag == False:
+            print(f'Concept Name dimensions: {len(concept_names_interps)}')
+        else:
+            print(f'Concept Name dimensions: {len(concept_names_interps)-1}')
         print(f'The number of role names is: {len(role_names_interps)}')
         print(f'The size of the domain is: {len(domain)}')
         print(f'Role names dimensions: {len(role_names_interps)}')
@@ -365,7 +380,7 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
         print(f'Final embedding dimension: {EMB_DIM}')
         print(f'The final dimension for role regions is: {EMB_DIM * 2}')
 
-    domain_embeddings_list = get_domain_embeddings(EMB_DIM, RESTRICT_LANGUAGE, SCALE_FACTOR) # This function initializes the vectors with 0 and one-hot encodes them according to \mu
+    domain_embeddings_list = get_domain_embeddings(EMB_DIM, RESTRICT_LANGUAGE, SCALE_FACTOR, INCLUDE_TOP) # This function initializes the vectors with 0 and one-hot encodes them according to \mu
 
     concept_names_ordering = EntityEmbedding.concept_names_idx_dict
     role_names_ordering = EntityEmbedding.role_names_idx_dict
@@ -379,6 +394,10 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
     index_finder_dict = index_finder(EMB_DIM, RESTRICT_LANGUAGE, concept_names_ordering, role_names_ordering, entities_ordering)
 
     faithful_concept_geometric_interps = get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddings_list, index_finder_dict, EMB_DIM, canonical_model)
+
+    if include_top_flag == True:
+
+        faithful_concept_geometric_interps.update({})
 
     print('============FINISHED INTERPS CONCEPT=============')
     print(f'There are {len(faithful_concept_geometric_interps)} regions for concept names.')

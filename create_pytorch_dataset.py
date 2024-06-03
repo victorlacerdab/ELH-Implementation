@@ -19,7 +19,7 @@ from create_geometric_interpretation import idx_finder_dict, INCLUDE_TOP, EMB_DI
 torch.manual_seed(33)
 
 TRAIN_SIZE_PROPORTION = 0.7 # Controls the proportion of training and test sets
-BATCH_SIZE = 128 # Desired batch size
+BATCH_SIZE = 512 # Desired batch size
 
 train_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/train_dataset.pt' # Path to save the training dataset
 test_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/test_dataset.pt' # Path to save the test dataset
@@ -29,7 +29,6 @@ test_concept_loader_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementa
 
 train_role_loader_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/train_role_loader.pt'
 test_role_loader_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/train_test_loader.pt'
-
 
 '''
 Function for generating 
@@ -93,7 +92,7 @@ def get_abox_dataset(ontology_dir: str,
     
     ontology = get_ontology(ontology_dir)
     ontology = ontology.load()
-    
+
     X_concepts = []
     X_roles = []
     y_concepts = []
@@ -101,7 +100,13 @@ def get_abox_dataset(ontology_dir: str,
 
     entities = [entity.name for entity in list(ontology.individuals())]
     
-    concept_to_idx_vocab = concept_to_idx
+    if include_top_flag == True:
+        concept_to_idx_vocab = concept_to_idx.copy()
+        concept_to_idx_vocab = {k: v+1 for k,v in concept_to_idx_vocab.items()}
+        concept_to_idx_vocab.update({'Thing': 0})
+    else:
+        concept_to_idx_vocab = concept_to_idx
+
     idx_to_concept_vocab = {value: key for key, value in concept_to_idx_vocab.items()}
 
     role_to_idx_vocab = role_to_idx
