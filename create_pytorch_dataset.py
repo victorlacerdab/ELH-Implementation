@@ -19,7 +19,7 @@ from create_geometric_interpretation import idx_finder_dict, INCLUDE_TOP, EMB_DI
 torch.manual_seed(33)
 
 TRAIN_SIZE_PROPORTION = 0.7 # Controls the proportion of training and test sets
-BATCH_SIZE = 512 # Desired batch size
+BATCH_SIZE = 128 # Desired batch size
 
 train_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/train_dataset.pt' # Path to save the training dataset
 test_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/test_dataset.pt' # Path to save the test dataset

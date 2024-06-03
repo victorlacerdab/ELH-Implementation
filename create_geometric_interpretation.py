@@ -95,8 +95,6 @@ class EntityEmbedding:
             if self.name in EntityEmbedding.concept_canonical_interpretation_dict[concept_name]:
                 embedding_vector[concept_name_idx] = 1 * self.scale_factor
                 self.in_interpretation_of.append(concept_name)
-        
-        # embedding_vector[0] = 0
 
         # Applies the embedding function to the role names portion of the definition
                 
@@ -131,8 +129,6 @@ class EntityEmbedding:
 
         #print(f'========================================================\n')
         # EntityEmbedding.entity_entityvector_dict[self.name].append(embedding_vector)
-        if self.name == 'Thing':
-            embedding_vector = np.zeros(np.shape(embedding_vector))
         EntityEmbedding.entity_entityvector_dict[self.name] = embedding_vector
 
         return embedding_vector
@@ -160,17 +156,11 @@ def get_domain_embeddings(emb_dim, restrict_language_flag, scale_factor):
    # The entities in the domain are strings
     
     for entity_name in EntityEmbedding.domain_dict:
-       if entity_name == 'Thing':
-           embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
-           embedded_entity.embedding_vector = np.zeros(np.shape(embedded_entity.embedding_vector))
-           embedded_entities.append(embedded_entity)
-           counter += 1
-       else:
-           embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
-           embedded_entities.append(embedded_entity)
-           counter += 1
+        embedded_entity = EntityEmbedding(entity_name, emb_dim, restrict_language_flag, scale_factor)
+        embedded_entities.append(embedded_entity)
+        counter += 1
        
-       if counter % 1000 == 0:
+        if counter % 1000 == 0:
            print(counter)
        
     return embedded_entities

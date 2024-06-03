@@ -387,7 +387,13 @@ Helper function for computing concept assertion loss.
 def compute_loss_concept(outputs1, outputs2, outputs3, labels, loss_fn, gamma, phi, neg_sampling):
     
     if neg_sampling:
-        loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels) + -loss_fn(outputs2, outputs3)
+
+        d_indparam_centroid = loss_fn(outputs2, labels)
+        d_conceptparam_indparam = gamma * loss_fn(outputs1, outputs2)
+        d_conceptparam_centroid = phi * loss_fn(outputs1, labels)
+        d_indparam_negsamparam = -loss_fn(outputs2.detach(), outputs3)
+
+        loss = d_indparam_centroid + d_conceptparam_indparam + d_conceptparam_centroid + d_indparam_negsamparam
 
     else:
         loss = loss_fn(outputs2, labels) + gamma * loss_fn(outputs1, outputs2) + phi * loss_fn(outputs1, labels)
@@ -436,10 +442,10 @@ def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, g
                 gamma * loss_fn(outputs1, real_concat_head_detach) +
                 gamma * loss_fn(outputs1, real_concat_tail_detach) +
                 phi * loss_fn(outputs1, labels) +
-                - loss_fn(real_concat_head_detach, tail_corrupted_concat) +
-                - loss_fn(real_concat_tail_detach, tail_corrupted_concat) +
-                - loss_fn(real_concat_head_detach, head_corrupted_concat) +
-                - loss_fn(real_concat_tail_detach, head_corrupted_concat)
+                - loss_fn(real_concat_head_detach.detach(), tail_corrupted_concat) +
+                - loss_fn(real_concat_tail_detach.detach(), tail_corrupted_concat) +
+                - loss_fn(real_concat_head_detach.detach(), head_corrupted_concat) +
+                - loss_fn(real_concat_tail_detach.detach(), head_corrupted_concat)
                 )
         
     else:
@@ -472,8 +478,6 @@ def train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling: b
         samples_num = inputs.size(0)
         total_samples += samples_num
 
-    # model.concept_parameter_constraint()
-
     return concept_loss, total_samples
 
 def train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
@@ -489,14 +493,12 @@ def train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
         outputs1, outputs2, outputs3, outputs4 = model(inputs) # Outputs1 = Role Parameter, outputs2 = SubjEntity, out3 = HeadEntity, outputs4 = neg_candidate
 
         loss = compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, model.gamma, model.phi, neg_sampling)
-            
+        
         loss.backward()
         optimizer.step()
         role_loss += loss.item()
         samples_num = inputs.size(0)
         total_samples += samples_num
-
-    # model.role_parameter_constraint()
 
     return role_loss, total_samples
 
@@ -508,7 +510,9 @@ def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sa
     role_loss, role_samples = train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling)
 
     total_loss = concept_loss + role_loss
+    total_loss = role_loss
     num_samples = concept_samples + role_samples
+    num_samples = role_samples
 
     return total_loss / num_samples
 
