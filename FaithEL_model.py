@@ -34,7 +34,7 @@ class FaithEL(nn.Module):
                                                       )
         with torch.no_grad():
             value = SCALE_FACTOR/2
-            std_dev = 0.8
+            std_dev = 0.9
             self.individual_embedding_dict.weight.data.normal_(mean=value, std=std_dev)
         
         self.concept_embedding_dict = nn.Embedding(len(concept_vocabulary),

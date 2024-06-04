@@ -149,7 +149,7 @@ class EntityEmbedding:
         return embedding_vector
     
 
-    '''
+'''
 Function for creating the binary vectors representing
 each element of the domain of the canonical interpretation.
 
@@ -395,10 +395,6 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
 
     faithful_concept_geometric_interps = get_faithful_concept_geometric_interps(concept_names_interps, domain_embeddings_list, index_finder_dict, EMB_DIM, canonical_model)
 
-    if include_top_flag == True:
-
-        faithful_concept_geometric_interps.update({})
-
     print('============FINISHED INTERPS CONCEPT=============')
     print(f'There are {len(faithful_concept_geometric_interps)} regions for concept names.')
     print('')
@@ -411,4 +407,4 @@ def create_tbox_embeddings(canonical_model: CanonicalModel, restrict_language_fl
 
     return domain_embeddings_list, faithful_concept_geometric_interps, faithful_role_geometric_interps, index_finder_dict, int(EMB_DIM), int(scale_factor) # Returns the faithful geometric interpretations for concepts and roles as lists
 
-domain_embeddings, concept_geointerps, role_geointerps, idx_finder_dict, EMB_DIM, SCALE_FACTOR = create_tbox_embeddings(canmodel, RESTRICT_LANGUAGE, SCALE_FACTOR)
+domain_embeddings, concept_geointerps, role_geointerps, idx_finder_dict, EMB_DIM, SCALE_FACTOR = create_tbox_embeddings(canmodel, RESTRICT_LANGUAGE, INCLUDE_TOP, SCALE_FACTOR)

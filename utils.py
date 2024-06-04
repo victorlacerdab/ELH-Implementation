@@ -378,7 +378,7 @@ Helper function for computing concept assertion loss.
         outputs2: The individual's parameter;
         outputs3: The negatively sampled individual:
         labels: the centroid of the concept's geometric interpretation
-        loss_fn: selected metric, standard is MSE
+        loss_fn: selected metric, standard is elementwise-MSE
         gamma = Hyperparameter for weighting how far the individual parameters are allowed to move;
         phi: Hyperparameter for weighting how far the role parameter is allowed to move;
         neg_sampling: Flag for indicating whether negative sampling is used or not.
@@ -419,8 +419,8 @@ def compute_loss_role(outputs1, outputs2, outputs3, outputs4, labels, loss_fn, g
     real_concat_no_detach = torch.cat((outputs2, outputs3), dim=1)
     real_concat_tail_detach = torch.cat((outputs2, outputs3.detach()), dim=1)
     real_concat_head_detach = torch.cat((outputs2.detach(), outputs3), dim=1)
-    tail_corrupted_concat = torch.cat((outputs2, outputs4), dim=1)
-    head_corrupted_concat = torch.cat((outputs4, outputs3), dim=1)
+    tail_corrupted_concat = torch.cat((outputs2.detach(), outputs4), dim=1)
+    head_corrupted_concat = torch.cat((outputs4, outputs3.detach()), dim=1)
 
     if neg_sampling:
 
@@ -502,19 +502,25 @@ def train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
 
     return role_loss, total_samples
 
-def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sampling: bool):
+def train(model, concept_dataloader, role_dataloader, loss_fn, optimizer, neg_sampling: bool, train_category: int):
     model.train()
-    total_loss = 0.0
+    # total_loss = 0.0
 
-    concept_loss, concept_samples = train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling)
-    role_loss, role_samples = train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling)
+    if train_category == 0:
+        concept_loss, concept_samples = train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling)
+        role_loss, role_samples = train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling)
+        total_loss = concept_loss + role_loss
+        num_samples = concept_samples + role_samples
+        return total_loss / num_samples
+    
+    elif train_category == 1:
+        concept_loss, concept_samples = train_concept(model, concept_dataloader, loss_fn, optimizer, neg_sampling)
+        return concept_loss / concept_samples
 
-    total_loss = concept_loss + role_loss
-    total_loss = role_loss
-    num_samples = concept_samples + role_samples
-    num_samples = role_samples
+    elif train_category == 2:
+        role_loss, role_samples = train_role(model, role_dataloader, loss_fn, optimizer, neg_sampling)
+        return role_loss / role_samples
 
-    return total_loss / num_samples
 
 ''' 
 Functions for obtaining test loss.
@@ -563,18 +569,26 @@ def test_role_loss(model, role_dataloader, loss_fn, neg_sampling: bool):
 '''
 Function call for obtaining test loss for concept and role assertions sequentially.
 '''
-def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling: bool):
+def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling: bool, train_category: int):
     model.eval()
     total_loss = 0.0
     num_batches = len(concept_dataloader) + len(role_dataloader)
 
-    concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
-    role_test_loss, role_samples = test_role_loss(model, role_dataloader, loss_fn, neg_sampling)
+    if train_category == 0:
 
-    total_samples = concept_samples + role_samples
-    total_loss = concept_test_loss + role_test_loss
-
-    return total_loss / total_samples
+        concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
+        role_test_loss, role_samples = test_role_loss(model, role_dataloader, loss_fn, neg_sampling)
+        total_samples = concept_samples + role_samples
+        total_loss = concept_test_loss + role_test_loss
+        return total_loss / total_samples
+    
+    elif train_category == 1:
+        concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
+        return concept_test_loss, concept_samples
+    
+    elif train_category == 2:
+        role_test_loss, role_samples = test_role_loss(model, role_dataloader, loss_fn, neg_sampling)
+        return role_test_loss, role_samples
 
 '''
 Main function for training.
@@ -593,7 +607,7 @@ def train_model(model, GeoInterp_dataclass,
                 idx_to_concept: dict, concept_to_idx: dict,
                 idx_to_role: dict, role_to_idx: dict,
                 centroid_score = False, neg_sampling = False,
-                plot_loss_flag = False
+                plot_loss_flag = False, train_category = 0
                 ):
 
     train_loss_list = []
@@ -607,9 +621,9 @@ def train_model(model, GeoInterp_dataclass,
 
 
     for epoch in range(1, num_epochs + 1):
-        train_loss = train(model, train_concept_loader, train_role_loader, loss_function, optimizer, neg_sampling)
+        train_loss = train(model, train_concept_loader, train_role_loader, loss_function, optimizer, neg_sampling, train_category)
         train_loss_list.append(train_loss)
-        test_loss = test(model, test_concept_loader, test_role_loader, loss_function, neg_sampling)
+        test_loss = test(model, test_concept_loader, test_role_loader, loss_function, neg_sampling, train_category)
         test_loss_list.append(test_loss)
 
         if epoch % loss_log_freq == 0:
