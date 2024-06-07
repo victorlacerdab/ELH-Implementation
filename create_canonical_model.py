@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 import random
 
 #dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
-dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
+#dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
+dir = '/Users/victorlacerda/Desktop/Wine.owl'
 #dir = '/Users/victorlacerda/Desktop/TestRole.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules

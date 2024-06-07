@@ -17,7 +17,7 @@ from create_geometric_interpretation import SCALE_FACTOR, GeometricInterpretatio
 torch.manual_seed(33)
 
 class FaithEL(nn.Module):
-    def __init__(self, emb_dim, phi, radius, gamma,
+    def __init__(self, emb_dim, phi, radius, gamma, psi,
                  individual_vocabulary,
                  concept_vocabulary,
                  role_vocabulary,
@@ -27,6 +27,7 @@ class FaithEL(nn.Module):
         self.emb_dim = emb_dim
         self.phi = phi # Weights how much the concept/role parameter moves
         self.gamma = gamma # Weights how much the individual embeddings moves
+        self.psi = psi
         self.radius = radius
 
         self.individual_embedding_dict = nn.Embedding(len(individual_vocabulary),
