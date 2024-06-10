@@ -576,9 +576,9 @@ def test(model, concept_dataloader, role_dataloader, loss_fn, neg_sampling: bool
     total_loss = 0.0
 
     if train_category == 0:
-
-        concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
+        
         role_test_loss, role_samples = test_role_loss(model, role_dataloader, loss_fn, neg_sampling)
+        concept_test_loss, concept_samples = test_concept_loss(model, concept_dataloader, loss_fn, neg_sampling)
         total_samples = concept_samples + role_samples
         total_loss = concept_test_loss + role_test_loss
         return total_loss / total_samples

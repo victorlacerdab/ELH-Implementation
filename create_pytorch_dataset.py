@@ -220,11 +220,6 @@ X_concepts, X_roles, y_concepts, y_roles, entity_to_idx_vocab, idx_to_entity_voc
 
 
 
-
-print(f'Len Concept Assertions Dataset: {len(X_concepts)}')
-print(f'Size of Role Assertions Dataset: {len(X_roles)}')
-print(f'')
-
 class OntologyDataset(Dataset):
     def __init__(self, data, labels):
         self.X = torch.tensor(data, dtype=torch.long)
