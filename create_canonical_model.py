@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 import random
 
 #dir = '/Users/victorlacerda/Documents/VSCode/ELHFaithfulness/NormalizedOntologies/family_ontology.owl'
-#dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
-dir = '/Users/victorlacerda/Desktop/Wine.owl'
+dir = '/Users/victorlacerda/Desktop/family_ontology.owl'
 #dir = '/Users/victorlacerda/Desktop/TestRole.owl'
 
 RESTRICT_LANGUAGE = False # If True, the language is restricted to simpler TBox axioms on the left-hand side of the rules
@@ -215,7 +214,6 @@ class CanonicalModel:
                         pair = (restriction_name, concept_name_str)
                         CanonicalModel.role_canonical_interpretation[role_name.name].append(pair)
                         
-        
         # Second case from Definition 10
 
         for restriction_name in self.concept_restrictions_dict.keys(): # Where restriction_name denotes an \exists r.B type of concept 'exists_' + self.concept.property.name + '.' + self.concept.value.name
@@ -244,7 +242,6 @@ class CanonicalModel:
                         c_D = 'And_' + ''.join(sorted(super_superclass.Classes[0].name + super_superclass.Classes[1].name))
                         CanonicalModel.role_canonical_interpretation[role_name_str].append((c_D, c_B))
                     
-        
             if role_name_str in restriction_name:
 
                 #print(f'It is true that {role_name_str} is in {restriction_name}.')

@@ -35,7 +35,7 @@ class FaithEL(nn.Module):
                                                       )
         with torch.no_grad():
             value = SCALE_FACTOR/2
-            std_dev = 0.9
+            std_dev = 0.99
             self.individual_embedding_dict.weight.data.normal_(mean=value, std=std_dev)
         
         self.concept_embedding_dict = nn.Embedding(len(concept_vocabulary),
@@ -70,7 +70,7 @@ class FaithEL(nn.Module):
             concept_idx = 0
             concept = data[:, concept_idx]
             subj_entity = data[:, subj_entity_idx]
-
+            
             neg_object_entity = torch.randint(0, self.individual_embedding_dict.weight.shape[0], (subj_entity.shape))
             #neg_object_entity = self.negative_sampler_concept(data)
 

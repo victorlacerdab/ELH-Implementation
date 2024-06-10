@@ -19,7 +19,7 @@ from create_geometric_interpretation import idx_finder_dict, INCLUDE_TOP, EMB_DI
 torch.manual_seed(33)
 
 TRAIN_SIZE_PROPORTION = 0.7 # Controls the proportion of training and test sets
-BATCH_SIZE = 512 # Desired batch size
+BATCH_SIZE = 1 # Desired batch size
 
 train_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/train_dataset.pt' # Path to save the training dataset
 test_path = '/Users/victorlacerda/Documents/VSCode/ELH-Implementation-New/data/test_dataset.pt' # Path to save the test dataset
@@ -217,6 +217,13 @@ X_concepts, X_roles, y_concepts, y_roles, entity_to_idx_vocab, idx_to_entity_voc
                                                                                                                                                                                         CanonicalModel, EntityEmbedding,
                                                                                                                                                                                         INCLUDE_TOP
                                                                                                                                                                                         )
+
+
+
+
+print(f'Len Concept Assertions Dataset: {len(X_concepts)}')
+print(f'Size of Role Assertions Dataset: {len(X_roles)}')
+print(f'')
 
 class OntologyDataset(Dataset):
     def __init__(self, data, labels):
